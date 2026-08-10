@@ -90,3 +90,61 @@ inputs.
 
 - `index.html` — all fixes applied (single-file app).
 - Tests/helpers used for verification live outside the repo.
+
+---
+
+# Stress-Test Audit Round 2 — 2026-08-10
+
+Method: Playwright + headless Chromium at `http://127.0.0.1:8811/`, static
+source scan + 16 dynamic scenarios (A–N) driving the app's globals directly
+and via the real UI (forms, autosave, delete flows, restore fuzz).
+
+## New Findings
+
+| # | Severity | Flaw | Evidence | Status |
+|---|----------|------|----------|--------|
+| 7 | High (data integrity) | BA numbers reuse deleted numbers: `generateBANumber` uses count+1 of current BA records, so deleting BA-0001 then creating a new BA yields a duplicate. Same pattern previously fixed for daily report IDs. | Repro: create BA-0001, BA-0002 → delete BA-0001 → create → list `["BA-0002","BA-0002"]` | Open |
+| 8 | Medium (data integrity) | Weekly Report left stale after deleting a daily: `deleteDailyReport` strips the id from `sourceDailyReportIds` but never regenerates the weekly, so `summaryData.dailySnapshots` and `autoSummary` still contain the deleted day (and its data appears in the weekly PDF). | `sourceIdsAfterDelete=["drD1"]`, `snapshotsAfterDelete=2`, `autoSummaryHasDay2=true` | Open |
+| 9 | Low | After an IndexedDB write failure the app persists `idb:` refs in localStorage whose blobs never got written; if the user ignores the on-screen warning and reloads, those photos become permanent broken `idb:key` strings. UI does warn ("jangan tutup tab ini"). | `idbPutAll` rejected → `photoRef:"idb:b1okeuj_120023"` survives reload unchanged | Open |
+| 10 | Low (UX) | Multiple dailies on the same date are allowed but the editor always loads the first match; the 2nd+ same-date daily is only reachable through preview. Report IDs stay unique (`DR-…-001/002`). | 2 dailies 2026-08-05, editor opens first | Open |
+| 11 | Low | No `storage` event listener → no cross-tab sync; two open tabs last-write-wins, silently losing concurrent edits. | `hasStorageListener:false` | Open |
+| 12 | Info | `fmtDate("2026-02-29")` rolls to `1 Mar 2026` (invalid date auto-corrected by JS `Date`). Low reach (date-picker inputs). | — | Open |
+
+## Verified Safe (stress checks passed)
+
+- **False-success save paths**: forced IndexedDB failure and forced
+  localStorage quota error both show explicit failure status; the app never
+  displays "Tersimpan" when persistence failed.
+- **Delete cascade (project)**: surveys unlinked to `survey_only`, all
+  project records removed, IndexedDB blobs cleaned (`1 → 0` keys), UI re-renders.
+- **Weekly aggregation integrity**: material totals, equipment days,
+  workforce, weather, photo count, and snapshots all match independent
+  hand-calculated values.
+- **Duplicate weekly (same period)**: confirm-dialog updates the existing
+  record, count stays 1.
+- **XSS / HTML injection**: `<img onerror>` and `<script>` payloads in project
+  name/location and progress text are fully escaped in list, editor, and
+  textarea (no live elements, no JS execution, no console/page errors).
+- **Restore fuzz**: invalid JSON, string, `{}`, wrong schema, `null`, orphan
+  `projectId` refs, duplicate ids — no crash, app renders, orphans filtered.
+- **ID generation**: daily report IDs `001/002/003` sequential per
+  project+date, no reuse after delete (`→004`); `uid()` unique over 1000 calls.
+- **Autosave**: text typed without pressing save is recovered after reload
+  (1800 ms debounce works).
+- **Large input**: 100k-char progress + 60 materials + 8 large photos: save +
+  reload intact, no errors.
+- **PDF previews**: daily (photo + materials) and weekly render; export
+  regression suite still green.
+- **Performance**: repeat `save()` does ~0 ms sync work (blob-hash cache).
+
+## Final Scores (1–10)
+
+Data integrity 7 · Storage 8 · PDF export 9 · Performance 9 · Security 9 · UX 8
+**Overall 8/10**
+
+## What Breaks First
+
+Under normal usage the first visible defect is **#7**: create 2+ Berita Acara,
+delete the first, then create a new one — the new BA silently gets a duplicate
+number already in use. Next is **#8**: delete a Daily after generating its
+Weekly and the weekly PDF still shows the deleted day's data.
