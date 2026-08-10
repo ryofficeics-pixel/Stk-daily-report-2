@@ -103,12 +103,21 @@ and via the real UI (forms, autosave, delete flows, restore fuzz).
 
 | # | Severity | Flaw | Evidence | Status |
 |---|----------|------|----------|--------|
-| 7 | High (data integrity) | BA numbers reuse deleted numbers: `generateBANumber` uses count+1 of current BA records, so deleting BA-0001 then creating a new BA yields a duplicate. Same pattern previously fixed for daily report IDs. | Repro: create BA-0001, BA-0002 → delete BA-0001 → create → list `["BA-0002","BA-0002"]` | Open |
-| 8 | Medium (data integrity) | Weekly Report left stale after deleting a daily: `deleteDailyReport` strips the id from `sourceDailyReportIds` but never regenerates the weekly, so `summaryData.dailySnapshots` and `autoSummary` still contain the deleted day (and its data appears in the weekly PDF). | `sourceIdsAfterDelete=["drD1"]`, `snapshotsAfterDelete=2`, `autoSummaryHasDay2=true` | Open |
-| 9 | Low | After an IndexedDB write failure the app persists `idb:` refs in localStorage whose blobs never got written; if the user ignores the on-screen warning and reloads, those photos become permanent broken `idb:key` strings. UI does warn ("jangan tutup tab ini"). | `idbPutAll` rejected → `photoRef:"idb:b1okeuj_120023"` survives reload unchanged | Open |
-| 10 | Low (UX) | Multiple dailies on the same date are allowed but the editor always loads the first match; the 2nd+ same-date daily is only reachable through preview. Report IDs stay unique (`DR-…-001/002`). | 2 dailies 2026-08-05, editor opens first | Open |
-| 11 | Low | No `storage` event listener → no cross-tab sync; two open tabs last-write-wins, silently losing concurrent edits. | `hasStorageListener:false` | Open |
-| 12 | Info | `fmtDate("2026-02-29")` rolls to `1 Mar 2026` (invalid date auto-corrected by JS `Date`). Low reach (date-picker inputs). | — | Open |
+| 7 | High (data integrity) | BA numbers reuse deleted numbers: `generateBANumber` uses count+1 of current BA records, so deleting BA-0001 then creating a new BA yields a duplicate. Same pattern previously fixed for daily report IDs. | Repro: create BA-0001, BA-0002 → delete BA-0001 → create → list `["BA-0002","BA-0002"]` | Fixed |
+| 8 | Medium (data integrity) | Weekly Report left stale after deleting a daily: `deleteDailyReport` strips the id from `sourceDailyReportIds` but never regenerates the weekly, so `summaryData.dailySnapshots` and `autoSummary` still contain the deleted day (and its data appears in the weekly PDF). | `sourceIdsAfterDelete=["drD1"]`, `snapshotsAfterDelete=2`, `autoSummaryHasDay2=true` | Fixed |
+| 9 | Low | After an IndexedDB write failure the app persists `idb:` refs in localStorage whose blobs never got written; if the user ignores the on-screen warning and reloads, those photos become permanent broken `idb:key` strings. UI does warn ("jangan tutup tab ini"). | `idbPutAll` rejected → `photoRef:"idb:b1okeuj_120023"` survives reload unchanged | Fixed |
+| 10 | Low (UX) | Multiple dailies on the same date are allowed but the editor always loads the first match; the 2nd+ same-date daily is only reachable through preview. Report IDs stay unique (`DR-…-001/002`). | 2 dailies 2026-08-05, editor opens first | Fixed |
+| 11 | Low | No `storage` event listener → no cross-tab sync; two open tabs last-write-wins, silently losing concurrent edits. | `hasStorageListener:false` | Fixed |
+| 12 | Info | `fmtDate("2026-02-29")` rolls to `1 Mar 2026` (invalid date auto-corrected by JS `Date`). Low reach (date-picker inputs). | — | Fixed |
+
+## Round 2 Fixes (all verified)
+
+- **#7** — `generateBANumber` now mirrors the daily-report-ID fix: `max(existing BA numeric suffix) + 1`, ignoring legacy non-numeric numbers. After delete, no reuse. Verify: delete BA-0001 → new = `BA-0003`, no collision.
+- **#8** — new `resyncWeeklyAfterDailyChange(weeklyId)` regenerates `summaryData`/`autoSummary`/`sourceDailyReportIds` from the week's current dailies; `deleteDailyReport` calls it for every weekly that referenced the deleted daily. Verify: after delete, `snapshots=1`, `autoSummary` no longer mentions the deleted day. Note: this regenerates the whole weekly from live dailies, so it also picks up any sibling edits made since generation.
+- **#9** — `hydrateIdbRefs` returns `null` for missing blob keys and a new `dropNullUrlEntries` prune removes photos whose blob is gone during `load()`. Verify: after forced IDB failure + reload, the broken `idb:` literal no longer persists (the unwritable photo is dropped; user is still warned at save time).
+- **#10** — when a date has multiple dailies the editor shows a picker (report ID + progress) above the form; selecting one loads that exact report. Verify: 2 dailies on 2026-08-05 → picker shows `DR-S-01`, `DR-S-02` → selecting the 2nd loads its text.
+- **#11** — `storage` event listener reloads the tab when another tab writes a *different* value; a `lastWrittenStorageValue` guard prevents reload loops on the tab's own writes/echoes. Verify: foreign change reloads, own-echo does not.
+- **#12** — `fmtDate` validates Y-M-D components strictly; invalid dates like `2026-02-29` render as the raw string instead of rolling to `1 Mar 2026`.
 
 ## Verified Safe (stress checks passed)
 
@@ -139,12 +148,17 @@ and via the real UI (forms, autosave, delete flows, restore fuzz).
 
 ## Final Scores (1–10)
 
-Data integrity 7 · Storage 8 · PDF export 9 · Performance 9 · Security 9 · UX 8
-**Overall 8/10**
+Pre-fix: Data integrity 7 · Storage 8 · PDF export 9 · Performance 9 ·
+Security 9 · UX 8 · **Overall 8/10**.
+
+Post-fix: Data integrity 9 · Storage 9 · PDF export 9 · Performance 9 ·
+Security 9 · UX 9 · **Overall 9/10**.
 
 ## What Breaks First
 
-Under normal usage the first visible defect is **#7**: create 2+ Berita Acara,
-delete the first, then create a new one — the new BA silently gets a duplicate
-number already in use. Next is **#8**: delete a Daily after generating its
-Weekly and the weekly PDF still shows the deleted day's data.
+Pre-fix: deleting a Berita Acara then creating a new one produces a duplicate
+BA number, and deleting a Daily after generating its Weekly leaves the deleted
+day's data in the weekly PDF. Both are now fixed (#7, #8). The next most likely
+user-visible issue is same-date dailies being awkward to edit (#10) and
+unwritable photos being dropped after an IndexedDB failure (#9) — both now
+handled with clear UI.
