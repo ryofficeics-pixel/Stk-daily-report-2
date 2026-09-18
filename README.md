@@ -10,6 +10,7 @@ Aplikasi web single-file untuk manajemen laporan harian konstruksi **PT. Solusi 
 - **Weekly Report** — ringkasan mingguan otomatis dari daily report (rekap material, peralatan, cuaca, tenaga kerja) plus lampiran PDF (target, progress, S-curve). Ringkasan dan tabel sumber yang panjang otomatis dipecah ke beberapa halaman A4 agar tidak terpotong; tombol **Simpan Progress** menyimpan edit tanpa keluar dari mode edit.
 - **Laporan Progress** — laporan berkala dengan tabel bobot pekerjaan, kendala + solusi, material, tenaga, alat, dan tanda tangan.
 - **Berita Acara** — BA dengan checklist pemeriksaan, foto, dan tanda tangan.
+- **Berita Acara 0.1** — varian BA dengan fitur dan tata letak yang sama, tanpa nama/logo perusahaan pada header dan footer hasil export.
 - **Export PDF** — semua laporan di-render ke halaman A4 siap cetak (via iframe print).
 - **Import PDF** — membaca PDF daily report yang sudah ada (via pdf.js) untuk mengimpor data material/peralatan/foto.
 - **Input Suara** — mengisi material/peralatan lewat suara (Web Speech API, bahasa Indonesia), termasuk parsing angka bahasa Indonesia ("lima puluh sak").
@@ -21,7 +22,7 @@ Buka `index.html` di browser (disarankan Google Chrome untuk fitur suara; aplika
 
 ## Versi
 
-`2026.05.20.project-sync-human-ui`
+`2026.09.18.berita-acara-01`
 
 ## Struktur
 
