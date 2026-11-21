@@ -16,6 +16,10 @@ Aplikasi web single-file untuk manajemen laporan harian konstruksi **PT. Solusi 
 - **Input Suara** — mengisi material/peralatan lewat suara (Web Speech API, bahasa Indonesia), termasuk parsing angka bahasa Indonesia ("lima puluh sak").
 - **Penyimpanan** — localStorage untuk data teks + IndexedDB untuk foto/lampiran besar (base64 data URL di-offload agar tidak melampaui kuota localStorage); backup/restore JSON. Penyimpanan dioptimalkan untuk ponsel: hanya blob foto yang berubah yang ditulis ulang ke IndexedDB, sehingga autosave ringan saat mengetik.
 
+## Backup Ringan
+
+Jika backup biasa terlalu besar (banyak foto) dan aplikasi freeze: gunakan tombol **Backup Ringan** (JSON tanpa foto), atau buka `export-lite.html` di alamat yang sama dengan aplikasi (tanpa memuat aplikasi) lalu unduh `stk-lite.json`.
+
 ## Cara Menggunakan
 
 Buka `index.html` di browser (disarankan Google Chrome untuk fitur suara; aplikasi juga berjalan di Brave/ponsel). Data tersimpan di browser lokal, tanpa backend.
