@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ekspor Ringan - STK Daily Report</title>
+<style>body{font-family:system-ui,Arial,sans-serif;background:#f0efe9;margin:0;display:grid;place-items:center;min-height:100vh;padding:16px}
+.c{background:#fff;border:1px solid #ddd;border-radius:20px;padding:24px;max-width:460px;width:100%}
+button{background:#111;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-size:15px;cursor:pointer;margin-top:12px}
+pre{background:#f6f6f2;padding:10px;border-radius:10px;overflow:auto;font-size:13px}</style></head>
+<body><div class="c">
+<h2 style="margin-top:0">Ekspor Ringan (tanpa foto)</h2>
+<p>Halaman ini membaca data aplikasi dari browser ini <b>tanpa memuat aplikasi</b>, jadi tidak freeze. Foto tidak ikut diekspor.</p>
+<pre id="info">Memeriksa data…</pre>
+<button id="dl" disabled>Unduh stk-lite.json</button>
+</div>
+<script>
+const KEY='ics-daily-report-v1';
+const info=document.getElementById('info'),btn=document.getElementById('dl');
+let out=null;
+try{
+  const raw=localStorage.getItem(KEY);
+  if(!raw){info.textContent='Tidak ada data aplikasi di browser/alamat ini.\nBuka halaman ini dari alamat yang sama dengan aplikasi lama.';}
+  else{
+    const d=JSON.parse(raw);
+    const strip=o=>JSON.parse(JSON.stringify(o,(k,v)=>typeof v==='string'&&(v.startsWith('data:')||v.startsWith('idb:'))?'[foto]':v));
+    out={lite:true,exportedAt:new Date().toISOString(),projects:d.projects||[],dailyReports:strip(d.dailyReports||[]),beritaAcara:strip(d.beritaAcara||[])};
+    const photos=(d.dailyReports||[]).reduce((n,r)=>n+((r.photos||[]).length),0);
+    info.textContent='Proyek: '+out.projects.length+'\nDaily Report: '+out.dailyReports.length+'\nBerita Acara: '+out.beritaAcara.length+'\nFoto (tidak diekspor): '+photos+'\nUkuran data teks: '+(JSON.stringify(out).length/1e6).toFixed(2)+' MB';
+    btn.disabled=false;
+  }
+}catch(e){info.textContent='Gagal membaca data: '+e.message;}
+btn.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out)],{type:'application/json'}));a.download='stk-lite.json';a.click();};
+</script></body></html>
